@@ -1,0 +1,16 @@
+﻿__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+db/*.duckdb
+db/*.duckdb.wal
+data/staging/*
+data/marts/*
+!data/staging/.gitkeep
+!data/marts/.gitkeep
+# Kredensial — JANGAN commit
+.env
+*.key
+*credentials*.json
+reports/_*
