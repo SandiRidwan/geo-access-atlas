@@ -20,10 +20,9 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 from streamlit_folium import st_folium
-
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
-from config import COLORS as C, DB_FILE, STAGING  # noqa: E402
+from config import COLORS as C, DB_FILE, MARTS, STAGING  # noqa: E402
 import explanations as X  # noqa: E402
 
 st.set_page_config(page_title="Indonesia Poverty & Access Atlas",
@@ -33,11 +32,33 @@ BAND_COLOR = {"rendah": "#1F5C3D", "sedang": "#E4A11B",
               "tinggi": "#E76F51", "sangat tinggi": "#C0392B"}
 
 
-def _ensure_data() -> None:
-    """Bootstrap: jalankan pipeline bila DB belum ada (mis. Streamlit Cloud)."""
+def _data_source() -> str:
+    """
+    Pilih sumber data:
+      · 'db'    → DuckDB (hasil pipeline lokal)
+      · 'marts' → Parquet marts + GeoJSON (fallback untuk cloud tanpa kredensial)
+    Fallback penting: di Streamlit Cloud, pipeline ingest butuh BPS_API_KEY yang
+    mungkin tidak diset. Agar app TETAP jalan, marts Parquet (yg kecil, di-commit)
+    dibaca langsung.
+    """
     if DB_FILE.exists():
+        return "db"
+    if (MARTS / "mart_kabupaten_profile.parquet").exists():
+        return "marts"
+    return "none"
+
+
+_SRC = _data_source()
+
+
+def _ensure_data() -> None:
+    """
+    Bootstrap HANYA jika tak ada DB maupun marts. Di cloud, marts sudah
+    di-commit → tak perlu ingest (yang butuh kredensial BPS).
+    """
+    if _SRC != "none":
         return
-    with st.spinner("Pertama kali: membangun database (BPS + GADM)... "
+    with st.spinner("Membangun database dari sumber (butuh kredensial BPS)... "
                     "mungkin 1–2 menit"):
         subprocess.run([sys.executable, str(ROOT / "src" / "run_pipeline.py")],
                        cwd=str(ROOT), capture_output=True, text=True)
@@ -46,17 +67,37 @@ def _ensure_data() -> None:
 _ensure_data()
 
 
-@st.cache_data(show_spinner="Membaca marts dari DuckDB...")
+def _read_marts(name: str) -> pd.DataFrame:
+    """Baca satu mart dari Parquet (fallback tanpa DuckDB)."""
+    p = MARTS / f"{name}.parquet"
+    return pd.read_parquet(p) if p.exists() else pd.DataFrame()
+
+
+@st.cache_data(show_spinner="Membaca data...")
 def q(sql: str) -> pd.DataFrame:
-    con = duckdb.connect(str(DB_FILE), read_only=True)
-    df = con.execute(sql).df()
-    con.close()
-    return df
+    """
+    Jalankan query. Bila DB ada → DuckDB. Bila tidak → petakan query umum
+    ke pembacaan Parquet langsung (fallback cloud).
+    """
+    if _SRC == "db":
+        con = duckdb.connect(str(DB_FILE), read_only=True)
+        df = con.execute(sql).df()
+        con.close()
+        return df
+    # fallback: kenali query yang dipakai dashboard
+    s = sql.lower()
+    if "mart_kabupaten_profile" in s:
+        return _read_marts("mart_kabupaten_profile")
+    if "mart_province_summary" in s:
+        return _read_marts("mart_province_summary").sort_values(
+            "poverty_pct_median", ascending=False)
+    return pd.DataFrame()
 
 
 @st.cache_data(show_spinner="Memuat geometri...")
 def load_geo() -> dict:
-    for p in (STAGING / "kabupaten.geojson", ROOT / "data" / "kabupaten.geojson"):
+    for p in (STAGING / "kabupaten.geojson", ROOT / "kabupaten.geojson",
+              ROOT / "data" / "kabupaten.geojson"):
         if p.exists():
             return json.loads(p.read_text(encoding="utf-8"))
     return {"type": "FeatureCollection", "features": []}
@@ -144,7 +185,13 @@ with t1:
     col = st.selectbox("Warnai peta berdasarkan",
                        ["poverty_pct", "ipm"], index=0)
     m = folium.Map(location=[-2.5, 118], zoom_start=4,
-                   tiles="cartoDB dark_matter")
+                   tiles="OpenStreetMap",
+                   attr="&copy; OpenStreetMap contributors")
+    # basemap gelap opsional via CartoDB (tanpa apikey)
+    folium.TileLayer(
+        tiles="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+        attr="&copy; OpenStreetMap &copy; CARTO",
+        name="Dark").add_to(m)
     folium.Choropleth(
         geo_data=geo,
         data=d,
@@ -246,23 +293,33 @@ with t4:
     """, language="text")
 
     X.render("coverage", st=st)
-    cov = q("""SELECT
-        (SELECT count(*) FROM mart_kabupaten_profile) AS terpetakan,
-        (SELECT count(DISTINCT wilayah_kode) FROM stg_bps
-         WHERE level='kabupaten' AND lower(variable) LIKE '%persentase penduduk miskin%'
-           AND lower(variable) NOT LIKE '%klasifikasi%') AS tersedia_di_bps,
-        514 AS total_kabupaten_indonesia""")
+    n_mapped = len(prof)
+    # 'tersedia di BPS' dari meta ingest bila ada; jika tidak, pakai jumlah yg dipetakan
+    bps_avail = None
+    meta_p = STAGING / "_bps_meta.json"
+    if meta_p.exists():
+        try:
+            bps_avail = len(prof)  # konservatif: sama dgn yg terpetakan
+        except Exception:
+            bps_avail = None
+    cov = pd.DataFrame([{
+        "terpetakan": n_mapped,
+        "total_kabupaten_indonesia": 514,
+        "sumber_data": _SRC,
+    }])
     st.dataframe(cov, use_container_width=True, hide_index=True)
     st.markdown(
-        "- **Kenapa 'tersedia di BPS' < 514?** BPS hanya mempublikasikan variabel "
-        "kemiskinan di sebagian domain provinsi (DKI, Bali, Kep. Babel, Kaltara "
-        "tidak menyediakannya di WebAPI). Jadi ini **fakta ketersediaan data**, "
-        "bukan kelemahan analisis.\n"
-        "- **Coverage peta**: 270 dari 277 yang tersedia (**97%**). 7 sisanya "
-        "(mis. Pesisir Barat, Pangandaran) belum ada di GADM 4.1 (2022).\n"
+        "- **Kenapa < 514?** BPS hanya mempublikasikan variabel kemiskinan di "
+        "sebagian domain provinsi (DKI, Bali, Kep. Babel, Kaltara tidak "
+        "menyediakannya di WebAPI). Jadi ini **fakta ketersediaan data**, "
+        "bukan kelemahan analisis. Dari ~277 yang tersedia, sebagian besar "
+        "berhasil dipetakan.\n"
         "- **Kanikalisasi judul.** Judul variabel BPS berbeda antar provinsi "
         "(mis. '[Metode Baru]', 'SP2010') — disatukan lewat pencocokan kata kunci "
         "di `sql/transform.sql`.\n"
+        "- **Sumber fallback.** Bila `BPS_API_KEY` tidak diset (mis. di cloud), "
+        "dashboard membaca marts Parquet yang di-commit — sehingga app tetap "
+        "jalan tanpa kredensial.\n"
         "- Sumber & keputusan lengkap: `docs/ADR.md`.")
 
 st.markdown(

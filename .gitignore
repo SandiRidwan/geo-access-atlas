@@ -3,14 +3,24 @@
 .venv/
 venv/
 .ipynb_checkpoints/
+
+# Database lokal (dibangun ulang oleh pipeline) — tidak di-commit
 db/*.duckdb
 db/*.duckdb.wal
+
+# Staging besar: tetap di-gitignore, KECUALI yang dibutuhkan app (cloud)
 data/staging/*
-data/marts/*
 !data/staging/.gitkeep
-!data/marts/.gitkeep
-# Kredensial — JANGAN commit
+!data/staging/kabupaten.geojson
+!data/staging/kabupaten.parquet
+
+# Kredensial — JANGAN pernah commit
 .env
 *.key
 *credentials*.json
+
+# Laporan sementara
 reports/_*
+
+# CATATAN: data/marts/*.parquet SENGAJA di-commit (kecil, ~59KB) agar
+# dashboard cloud dapat berjalan tanpa kredensial BPS.
