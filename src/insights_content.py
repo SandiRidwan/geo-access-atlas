@@ -136,3 +136,55 @@ register(
         "salah sasaran → pembangunan manusia stagnan meski ekonomi 'terlihat' naik."),
     tingkat="sedang",
 )
+
+
+# --------------------------------------------------------------------------
+# Chart ECharts (v2) — insight & rekomendasi.
+# --------------------------------------------------------------------------
+
+register(
+    "echarts_boxplot",
+    kesimpulan=(
+        "Boxplot kemiskinan per provinsi menunjukkan MEDIAN, SEBARAN, dan "
+        "KABUPATEN PENCILAN. Provinsi dengan kotak tinggi = ketimpangan internal "
+        "besar (ada kabupaten sangat miskin sekaligus sangat kaya dalam satu "
+        "provinsi). Provinsi dengan median tinggi & kotak sempit = kemiskinan "
+        "merata — tantangan berbeda, penanganan berbeda."),
+    rekomendasi=[
+        "Bedakan dua pola: (a) median tinggi & merata → intervensi provinsi-"
+        "lebar; (b) median rendah tapi kotak tinggi → sasaran kabupaten "
+        "spesifik, bukan provinsi.",
+        "Prioritaskan kabupaten pencilan (titik di atas whisker) untuk "
+        "intervensi darurat.",
+        "Bandingkan pola ini antar-tahun untuk melihat provinsi yang "
+        "ketimpangannya menyempit/memburuk.",
+    ],
+    risiko=(
+        "Program berbasis rata-rata provinsi bisa melewatkan kabupaten paling "
+        "miskin di provinsi 'berpendapatan sedang'. Sumber daya salah alokasi, "
+        "dan kantong kemiskinan tetap tersembunyi dalam agregat."),
+    tingkat="tinggi",
+)
+
+register(
+    "echarts_parallel",
+    kesimpulan=(
+        "Parallel coordinates menampilkan profil multi-indikator tiap provinsi "
+        "(kemiskinan median/maks, IPM, jumlah kabupaten, luas) dalam satu "
+        "pandangan. Garis menyilang tajam = kombinasi tak biasa, mis. kemiskinan "
+        "median rendah tetapi kemiskinan MAKSIMUM tinggi (ada kantong ekstrem), "
+        "atau IPM tinggi namun luas wilayah raksasa (tantangan jangkauan layanan)."),
+    rekomendasi=[
+        "Sorot provinsi dengan jurang besar antara kemiskinan median dan maksimum "
+        "— itu indikator ketimpangan yang butuh perhatian khusus.",
+        "Untuk provinsi luas + IPM rendah, prioritaskan strategi jangkauan "
+        "(infrastruktur/distribusi), bukan sekadar program ekonomi.",
+        "Gunakan profil ini untuk menyusun tipologi provinsi sebelum alokasi "
+        "anggaran.",
+    ],
+    risiko=(
+        "Kebijakan seragam nasional mengabaikan bahwa provinsi punya 'bentuk' "
+        "masalah berbeda. Intervensi yang tepat di satu provinsi bisa tidak "
+        "relevan di provinsi lain dengan profil menyilang."),
+    tingkat="sedang",
+)

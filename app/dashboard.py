@@ -291,7 +291,7 @@ with t3:
                 yname="kemiskinan (%)", height=520)
     except Exception as _e:  # noqa: BLE001
         st.caption(f"boxplot tak tersedia ({_e}).")
-    INS.box("province", st=st)
+    INS.box("echarts_boxplot", st=st)
 
     st.markdown("#### Profil multi-indikator per provinsi (parallel ECharts)")
     st.caption("Parallel coordinates membandingkan **banyak dimensi sekaligus**. "
@@ -332,7 +332,7 @@ with t3:
                             title="Profil multi-indikator provinsi", height=480)
     except Exception as _e:  # noqa: BLE001
         st.caption(f"parallel tak tersedia ({_e}).")
-    INS.box("province", st=st)
+    INS.box("echarts_parallel", st=st)
 
     if d["ipm"].notna().any():
         X.render("ipm", st=st)
