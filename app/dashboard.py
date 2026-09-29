@@ -24,6 +24,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 from config import COLORS as C, DB_FILE, MARTS, STAGING  # noqa: E402
 import explanations as X  # noqa: E402
+import insights_content  # noqa: E402,F401
+import insight as INS  # noqa: E402
 
 st.set_page_config(page_title="Indonesia Poverty & Access Atlas",
                    page_icon="🗺️", layout="wide")
@@ -171,6 +173,7 @@ kpi(k3, "Median nasional", f"{prof['poverty_pct'].median():.1f}%",
 kpi(k4, "Sangat tinggi (≥20%)",
     f"{(prof['poverty_pct']>=20).sum()}",
     "kabupaten", C["purple"])
+INS.box("kpi", st=st)
 st.write("")
 
 t1, t2, t3, t4 = st.tabs(["🗺️ Peta", "🏆 Peringkat", "📊 Provinsi & Kelas",
@@ -218,6 +221,7 @@ with t1:
     ).add_to(m)
     st_folium(m, height=560, use_container_width=True, returned_objects=[])
     st.caption("Warna gelap = nilai ekstrem. Kabupaten tanpa data berwarna abu.")
+    INS.box("map", st=st)
 
 with t2:
     X.render("ranking", st=st)
@@ -240,6 +244,7 @@ with t2:
         style(fig, 620).update_layout(title="", xaxis_title="%",
                                       yaxis_title="", showlegend=False)
         st.plotly_chart(fig, use_container_width=True)
+    INS.box("ranking", st=st)
 
 with t3:
     X.render("band", st=st)
@@ -253,6 +258,7 @@ with t3:
                                   xaxis_title="", yaxis_title="kabupaten",
                                   showlegend=False)
     st.plotly_chart(fig, use_container_width=True)
+    INS.box("band", st=st)
 
     X.render("province", st=st)
     fig = px.bar(prov, x="poverty_pct_median", y="nama_prov",
@@ -264,6 +270,7 @@ with t3:
                                   xaxis_title="%", yaxis_title="")
     st.plotly_chart(fig, use_container_width=True)
     st.dataframe(prov, use_container_width=True, hide_index=True)
+    INS.box("province", st=st)
 
     if d["ipm"].notna().any():
         X.render("ipm", st=st)
@@ -276,6 +283,7 @@ with t3:
                                       xaxis_title="IPM",
                                       yaxis_title="Kemiskinan (%)")
         st.plotly_chart(fig, use_container_width=True)
+        INS.box("ipm", st=st)
 
 with t4:
     X.render("method", st=st)
