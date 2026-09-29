@@ -184,14 +184,17 @@ with t1:
                 for f in geo.get("features", [])}
     col = st.selectbox("Warnai peta berdasarkan",
                        ["poverty_pct", "ipm"], index=0)
-    m = folium.Map(location=[-2.5, 118], zoom_start=4,
-                   tiles="OpenStreetMap",
-                   attr="&copy; OpenStreetMap contributors")
-    # basemap gelap opsional via CartoDB (tanpa apikey)
-    folium.TileLayer(
-        tiles="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-        attr="&copy; OpenStreetMap &copy; CARTO",
-        name="Dark").add_to(m)
+    basemap = st.radio("Latar peta", ["Polos (andal)", "OpenStreetMap"],
+                       horizontal=True, index=0)
+    if basemap == "OpenStreetMap":
+        m = folium.Map(location=[-2.5, 118], zoom_start=4,
+                       tiles="OpenStreetMap",
+                       attr="&copy; OpenStreetMap contributors")
+    else:
+        # Tanpa tile eksternal: latar solid, hanya batas & warna kabupaten.
+        # Andal di lingkungan yang memblok tile (mis. jaringan terbatas).
+        m = folium.Map(location=[-2.5, 118], zoom_start=4,
+                       tiles=None, zoom_control=True)
     folium.Choropleth(
         geo_data=geo,
         data=d,
