@@ -23,10 +23,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Verifikasi kode & marts yang di-commit tanpa perlu kredensial:
-      #  1) syntax semua modul
-      #  2) audit narasi (penjelasan & insight lengkap)
-      #  3) bangun ulang DB dari marts yang ada, lalu uji kualitas data
       - name: Compile check
         run: python -m compileall -q src app tests
 
@@ -35,8 +31,26 @@ jobs:
           python src/explanations.py
           python -c "import sys; sys.path.insert(0,'src'); import insights_content; import insight; sys.exit(0 if insight.audit() else 1)"
 
-      - name: Rebuild DuckDB from committed marts
-        run: python scripts/rebuild_from_marts.py
+      # GADM boundaries (publik, TANPA kredensial) → staging + geometri.
+      - name: Ingest GADM boundaries
+        run: python src/ingest_geo.py
+
+      # BPS opsional: dijalankan HANYA bila secret BPS_API_KEY diset.
+      - name: Ingest BPS indicators (opsional)
+        env:
+          BPS_API_KEY: ${{ secrets.BPS_API_KEY }}
+        run: |
+          if [ -n "$BPS_API_KEY" ]; then
+            python src/ingest_bps.py
+          else
+            echo "BPS_API_KEY tidak diset — melewati ingest BPS (pakai data marts)."
+          fi
+
+      # Muat staging yang ada + rebuild tabel marts dari Parquet (agar lengkap).
+      - name: Load staging + rebuild marts
+        run: |
+          python src/load_db.py
+          python scripts/rebuild_from_marts.py
 
       - name: Data quality tests
         run: python tests/test_data_quality.py
