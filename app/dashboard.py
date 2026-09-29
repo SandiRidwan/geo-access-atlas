@@ -26,6 +26,7 @@ from config import COLORS as C, DB_FILE, MARTS, STAGING  # noqa: E402
 import explanations as X  # noqa: E402
 import insights_content  # noqa: E402,F401
 import insight as INS  # noqa: E402
+import echarts_charts as EC  # noqa: E402  (parallel, boxplot)
 
 st.set_page_config(page_title="Indonesia Poverty & Access Atlas",
                    page_icon="🗺️", layout="wide")
@@ -270,6 +271,67 @@ with t3:
                                   xaxis_title="%", yaxis_title="")
     st.plotly_chart(fig, use_container_width=True)
     st.dataframe(prov, use_container_width=True, hide_index=True)
+    INS.box("province", st=st)
+
+    st.markdown("#### Sebaran kemiskinan antar-kabupaten per provinsi "
+                "(boxplot ECharts)")
+    st.caption("Boxplot per provinsi memperlihatkan **median, rentang antarkuartil, "
+               "dan kabupaten pencilan**. Provinsi dengan kotak panjang = "
+               "ketimpangan internal besar (ada kabupaten sangat miskin dan "
+               "sangat kaya dalam satu provinsi).")
+    try:
+        _pv = (d.groupby("nama_prov")["poverty_pct"].apply(list))
+        _pv = _pv[_pv.map(len) >= 3].sort_values(key=lambda s: s.map(
+            lambda x: pd.Series(x).median()))
+        if len(_pv):
+            EC.boxplot(
+                categories=[str(k)[:18] for k in _pv.index],
+                values=[list(v) for v in _pv.values],
+                title="Sebaran kemiskinan kabupaten per provinsi (diurut median)",
+                yname="kemiskinan (%)", height=520)
+    except Exception as _e:  # noqa: BLE001
+        st.caption(f"boxplot tak tersedia ({_e}).")
+    INS.box("province", st=st)
+
+    st.markdown("#### Profil multi-indikator per provinsi (parallel ECharts)")
+    st.caption("Parallel coordinates membandingkan **banyak dimensi sekaligus**. "
+               "Tiap garis = satu provinsi; garis yang menyilang tajam menandakan "
+               "profil tidak biasa (mis. kemiskinan tinggi tapi IPM juga tinggi). "
+               "Pilih provinsi untuk disorot.")
+    try:
+        _agg = prov.copy()
+        if "ipm_median" not in _agg.columns and d["ipm"].notna().any():
+            _ipm_med = d.groupby("nama_prov")["ipm"].median()
+            _agg = _agg.merge(_ipm_med.rename("ipm_median"),
+                              left_on="nama_prov", right_index=True)
+        _dims = [c for c in ["poverty_pct_median", "poverty_pct_max",
+                             "ipm_median", "n_kabupaten", "total_area_km2"]
+                 if c in _agg.columns]
+        _labels = {"poverty_pct_median": "Kemiskinan median (%)",
+                   "poverty_pct_max": "Kemiskinan max (%)",
+                   "ipm_median": "IPM median", "n_kabupaten": "Jumlah kab",
+                   "total_area_km2": "Luas (km2)"}
+        if len(_dims) >= 2:
+            _axes, _rows, _names = [], [], []
+            for i, cname in enumerate(_dims):
+                _axes.append({"dim": i, "name": _labels.get(cname, cname)})
+            for r in _agg.itertuples():
+                vals = []
+                ok = True
+                for cname in _dims:
+                    v = getattr(r, cname)
+                    if pd.isna(v):
+                        ok = False
+                        break
+                    vals.append(float(v))
+                if ok:
+                    _rows.append(vals)
+                    _names.append(str(r.nama_prov))
+            if _rows:
+                EC.parallel(_axes, _rows, names=_names,
+                            title="Profil multi-indikator provinsi", height=480)
+    except Exception as _e:  # noqa: BLE001
+        st.caption(f"parallel tak tersedia ({_e}).")
     INS.box("province", st=st)
 
     if d["ipm"].notna().any():
